@@ -509,20 +509,21 @@
             }
 
         /** INPUT EVENTS **/
-    // Bind directly to the canvas so UI buttons still register clicks on mobile
-    canvas.addEventListener('mousedown', pulse);
-    canvas.addEventListener('touchstart', (e) => { 
-        e.preventDefault(); // Prevents zooming/scrolling only on the game area
-        pulse(); 
-    }, {passive: false});
-    
-    // Keydown can stay on the window
-    window.addEventListener('keydown', (e) => { 
-        if (e.code === 'Space') { 
-            e.preventDefault(); 
+        // Bind touch and mouse events strictly to the canvas!
+        // This allows your HTML UI buttons to be clicked normally.
+        canvas.addEventListener('mousedown', pulse);
+        canvas.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); // Prevents zooming/scrolling ONLY on the game area
             pulse(); 
-        }
-    });
+        }, {passive: false});
+
+        // Keydown can stay on the window for desktop spacebar support
+        window.addEventListener('keydown', (e) => { 
+            if (e.code === 'Space') { 
+                e.preventDefault(); 
+                pulse(); 
+            }
+        });
 
     </script>
 
