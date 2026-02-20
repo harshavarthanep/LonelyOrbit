@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Lonely Orbit</title>
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="description" content="A zen precision survival game.">
+    
+    <link rel="manifest" href="manifest.json?v=1" id="manifest-placeholder">
+
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --ring-color: #2a2a2a;
+            --hero-color: #ffcc00; /* Glowing Yellow Sun */
+            --danger-color: #ffffff;
+            --ui-font: 'Courier New', Courier, monospace;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: var(--ui-font);
+            touch-action: none;
+            user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #888;
+        }
+
+        #score-display {
+            color: var(--hero-color);
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+
+        /* Menus */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            border-bottom: 2px solid var(--hero-color);
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        p { color: #aaa; margin-bottom: 2rem; max-width: 300px; line-height: 1.5; font-size: 0.9rem;}
+
+        button {
+            background: transparent;
+            color: var(--hero-color);
+            border: 1px solid var(--hero-color);
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-family: var(--ui-font);
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            transition: all 0.2s;
+            margin: 10px;
+        }
+
+        button:active { transform: scale(0.95); background: rgba(255, 204, 0, 0.1); }
+
+        #sound-btn {
+            pointer-events: auto;
+            background: none;
+            border: 1px solid #555;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            cursor: pointer;
+            color: #888;
+            padding: 0;
+        }
+
+        #tutorial {
+            position: absolute;
+            bottom: 15%;
+            width: 100%;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+
+        /* INSTALL POPUP */
+        #install-modal {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; background: #1a1a1a; padding: 20px;
+            border: 1px solid var(--hero-color); text-align: center; z-index: 1000;
+            display: none; color: white;
+        }
+        #install-modal h3 { margin-top: 0; color: var(--hero-color); font-weight: normal; letter-spacing: 2px;}
+        #install-btn { background: var(--hero-color); color: #000; border: none; padding: 10px 20px; width: 100%; margin-top: 10px;}
+        #close-install { position: absolute; top: 10px; right: 15px; cursor: pointer; color: #888; }
+        .ios-instructions { font-size: 0.8rem; color: #888; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="hud-top">
+            <span id="score-display">DAYS: 0</span>
+            <button id="sound-btn">🔊</button>
+        </div>
+        <div id="tutorial" class="hidden">TAP TO PULSE OUTWARD</div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>THE LONELY ORBIT</h1>
+        <p>Stay in orbit. <br>Tap to push away from the center. <br>Dodge the debris.</p>
+        <button onclick="startGame()">ENTER ORBIT</button>
+        <button id="menu-install-btn" class="hidden" style="border-color: #555; color: #fff;">INSTALL GAME</button>
+        <p style="font-size: 0.7rem; margin-top: 30px; border-top: 1px solid #333; padding-top: 10px;">v1.0.0 | H24 Creationz</p>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color: #ff3333; border-color: #ff3333;">ORBIT DECAYED</h1>
+        <p>SURVIVED: <span id="final-score" style="color: var(--hero-color);">0</span> DAYS</p>
+        <p>LONGEST: <span id="best-score" style="color: #fff;">0</span> DAYS</p>
+        <button onclick="startGame()">RESTART</button>
+        <button onclick="showHome()" style="border-color: #555; color: #aaa;">MENU</button>
+    </div>
+
+    <script>
+        /** ENGINE CONFIG **/
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'MENU'; 
+        let score = 0;
+        let frames = 0;
+        let highScore = localStorage.getItem('lonely_orbit_highscore') || 0;
+        let soundEnabled = true;
+        let audioCtx;
+
+        let cx, cy; // Center of screen
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            cx = canvas.width / 2;
+            cy = canvas.height / 2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        /** GAME OBJECTS **/
+        const blackHole = { radius: 30 };
+        
+        const player = {
+            angle: 0,
+            radius: 100,
+            targetRadius: 100,
+            size: 8,
+            speed: 0.03,
+            color: '#ffcc00'
+        };
+
+        let asteroids = [];
+        let particles = [];
+
+        /** AUDIO SYSTEM **/
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'pulse') {
+                // Soft chime
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.3);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'death') {
+                // Deep bass drop
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(20, now + 0.8);
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                osc.start(now); osc.stop(now + 0.8);
+            }
+        }
+
+        document.getElementById('sound-btn').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-btn').innerText = soundEnabled ? '🔊' : '🔇';
+            initAudio();
+        });
+
+        /** GAME LOGIC **/
+        function pulse() {
+            if (gameState !== 'PLAYING') return;
+            document.getElementById('tutorial').classList.add('hidden');
+            
+            // Push outwards
+            player.targetRadius += 40;
+            // Cap max distance so they can't hide off screen
+            if (player.targetRadius > Math.min(cx, cy) - 20) {
+                player.targetRadius = Math.min(cx, cy) - 20;
+            }
+            
+            playSound('pulse');
+            createParticles(
+                cx + player.radius * Math.cos(player.angle), 
+                cy + player.radius * Math.sin(player.angle), 
+                player.color, 3
+            );
+        }
+
+        function spawnAsteroid() {
+            // Spawn outside the screen and move inwards
+            let angle = Math.random() * Math.PI * 2;
+            let dist = Math.max(canvas.width, canvas.height);
+            
+            // Target a point slightly off-center to make orbits interesting
+            let targetX = cx + (Math.random() - 0.5) * 100;
+            let targetY = cy + (Math.random() - 0.5) * 100;
+            
+            let startX = cx + Math.cos(angle) * dist;
+            let startY = cy + Math.sin(angle) * dist;
+            
+            let moveAngle = Math.atan2(targetY - startY, targetX - startX);
+            let speed = 2 + Math.random() * 2 + (score / 1000); // gets faster over time
+
+            asteroids.push({
+                x: startX, y: startY,
+                vx: Math.cos(moveAngle) * speed,
+                vy: Math.sin(moveAngle) * speed,
+                size: 3 + Math.random() * 4
+            });
+        }
+
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 1.0, color: color, size: Math.random() * 3
+                });
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            gameState = 'PLAYING';
+            score = 0;
+            frames = 0;
+            asteroids = [];
+            particles = [];
+            
+            player.angle = 0;
+            player.radius = 120;
+            player.targetRadius = 120;
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('tutorial').classList.remove('hidden');
+            
+            loop();
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            playSound('death');
+            
+            let px = cx + player.radius * Math.cos(player.angle);
+            let py = cy + player.radius * Math.sin(player.angle);
+            createParticles(px, py, '#ff3333', 40);
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('lonely_orbit_highscore', highScore);
+            }
+
+            // OPTIONAL FIREBASE CALL
+            saveScoreToCloud(score);
+
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('best-score').innerText = highScore;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function showHome() {
+            gameState = 'MENU';
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+        }
+
+        /** OPTIONAL FIREBASE SETUP **/
+        // To use Firebase, uncomment the import block below and configure it.
+        /*
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        
+        // YOUR CONFIG HERE
+        const app = initializeApp({...}); 
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        signInAnonymously(auth);
+        */
+
+        function saveScoreToCloud(finalScore) {
+            console.log("Local save successful. Firebase is currently disabled.");
+            /* UNCOMMENT TO ENABLE CLOUD SAVING
+            const user = auth.currentUser;
+            if (user) {
+                addDoc(collection(db, "leaderboard"), {
+                    uid: user.uid, score: finalScore, game: "LonelyOrbit", date: serverTimestamp()
+                }).catch(e => console.error("Cloud Error", e));
+            }
+            */
+        }
+
+        /** MAIN LOOP **/
+        function loop() {
+            if (gameState !== 'PLAYING') return;
+            requestAnimationFrame(loop);
+            frames++;
+
+            // Clear Screen
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.3)'; // Trail effect
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Time/Score
+            if (frames % 60 === 0) {
+                score++;
+                document.getElementById('score-display').innerText = "DAYS: " + score;
+            }
+
+            // Draw Background Rings
+            ctx.strokeStyle = '#1f1f1f';
+            ctx.lineWidth = 1;
+            for(let i=50; i<Math.max(cx, cy); i+=50) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, i, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Draw Black Hole
+            ctx.beginPath();
+            ctx.arc(cx, cy, blackHole.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Update Player Physics
+            // 1. Gravity pulls inward constantly
+            player.targetRadius -= 0.5 + (score * 0.005); 
+            // 2. Smooth movement towards target radius
+            player.radius += (player.targetRadius - player.radius) * 0.1;
+            // 3. Spin
+            player.angle += player.speed;
+
+            let px = cx + player.radius * Math.cos(player.angle);
+            let py = cy + player.radius * Math.sin(player.angle);
+
+            // Check if sucked into black hole
+            if (player.radius < blackHole.radius) {
+                gameOver();
+                return;
+            }
+
+            // Draw Player Glow
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = player.color;
+            ctx.beginPath();
+            ctx.arc(px, py, player.size, 0, Math.PI * 2);
+            ctx.fillStyle = player.color;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Spawn Asteroids
+            let spawnRate = Math.max(20, 90 - Math.floor(score / 5)); // Gets faster
+            if (frames % spawnRate === 0) spawnAsteroid();
+
+            // Update & Draw Asteroids
+            ctx.fillStyle = '#fff';
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                let ast = asteroids[i];
+                ast.x += ast.vx;
+                ast.y += ast.vy;
+
+                ctx.beginPath();
+                ctx.arc(ast.x, ast.y, ast.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Trail
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.beginPath();
+                ctx.moveTo(ast.x, ast.y);
+                ctx.lineTo(ast.x - ast.vx*3, ast.y - ast.vy*3);
+                ctx.stroke();
+
+                // Collision with player
+                let dist = Math.hypot(px - ast.x, py - ast.y);
+                if (dist < player.size + ast.size) {
+                    gameOver();
+                    return;
+                }
+
+                // Remove if it goes into black hole or far off screen
+                let distToCenter = Math.hypot(cx - ast.x, cy - ast.y);
+                if (distToCenter < blackHole.radius) {
+                    createParticles(ast.x, ast.y, '#555', 5);
+                    asteroids.splice(i, 1);
+                } else if (distToCenter > Math.max(canvas.width, canvas.height) + 100) {
+                    asteroids.splice(i, 1);
+                }
+            }
+
+            // Particles
+            particles.forEach((p, i) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.03;
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                if (p.life <= 0) particles.splice(i, 1);
+            });
+        }
+
+        /** INPUT EVENTS **/
+        window.addEventListener('mousedown', pulse);
+        window.addEventListener('touchstart', (e) => { e.preventDefault(); pulse(); }, {passive: false});
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); pulse(); }});
+
+    </script>
+
+    <div id="install-modal">
+        <span id="close-install" onclick="closeInstallModal()">X</span>
+        <h3>INSTALL APP</h3>
+        <p style="color: #aaa;">Install The Lonely Orbit for an immersive experience.</p>
+        <button id="install-btn" class="hidden">INSTALL NOW</button>
+        <div id="ios-prompt" class="hidden ios-instructions">
+            To install on iPhone:<br>
+            1. Tap <strong>Share</strong> <br>
+            2. Tap <strong>Add to Home Screen</strong>
+        </div>
+    </div>
+    
+    <script>
+        let deferredPrompt;
+        const installModal = document.getElementById('install-modal');
+        const installBtn = document.getElementById('install-btn');
+        const iosPrompt = document.getElementById('ios-prompt');
+        const menuInstallBtn = document.getElementById('menu-install-btn');
+    
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW failed: ', err));
+            });
+        }
+    
+        const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+    
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installModal.style.display = 'block';
+            installBtn.classList.remove('hidden');
+            menuInstallBtn.classList.remove('hidden');
+            installBtn.addEventListener('click', triggerInstall);
+            menuInstallBtn.addEventListener('click', triggerInstall);
+        });
+        
+        function triggerInstall() {
+            installModal.style.display = 'none';
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') menuInstallBtn.classList.add('hidden');
+                    deferredPrompt = null;
+                });
+            }
+        }
+    
+        if (isIos() && !isInStandaloneMode()) {
+            installModal.style.display = 'block';
+            installBtn.classList.add('hidden');
+            iosPrompt.classList.remove('hidden');
+        }
+        function closeInstallModal() { installModal.style.display = 'none'; }
+    </script>  
+</body>
+</html>
