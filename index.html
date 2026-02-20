@@ -488,25 +488,41 @@
                 }
             }
 
-            // Particles
-            particles.forEach((p, i) => {
+            // Particles (Iterate backward when splicing to avoid visual stutter)
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
                 p.x += p.vx;
                 p.y += p.vy;
                 p.life -= 0.03;
-                ctx.globalAlpha = p.life;
+                
+                // Safety check to ensure alpha doesn't drop below 0 (causes errors in some browsers)
+                ctx.globalAlpha = p.life > 0 ? p.life : 0; 
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
-                if (p.life <= 0) particles.splice(i, 1);
-            });
-        }
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
 
         /** INPUT EVENTS **/
-        window.addEventListener('mousedown', pulse);
-        window.addEventListener('touchstart', (e) => { e.preventDefault(); pulse(); }, {passive: false});
-        window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); pulse(); }});
+    // Bind directly to the canvas so UI buttons still register clicks on mobile
+    canvas.addEventListener('mousedown', pulse);
+    canvas.addEventListener('touchstart', (e) => { 
+        e.preventDefault(); // Prevents zooming/scrolling only on the game area
+        pulse(); 
+    }, {passive: false});
+    
+    // Keydown can stay on the window
+    window.addEventListener('keydown', (e) => { 
+        if (e.code === 'Space') { 
+            e.preventDefault(); 
+            pulse(); 
+        }
+    });
 
     </script>
 
